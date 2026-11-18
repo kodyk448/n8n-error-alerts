@@ -1,0 +1,110 @@
+{
+  "name": "Error alert (email)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "909d71d8-d149-56fe-bd97-a12e2a1d0cdd",
+      "name": "When any workflow fails",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Turns n8n's error data into one readable alert.\n// n8n sends two shapes: `execution` when a step fails mid-run, `trigger` when the trigger itself fails (no run is created).\nreturn $input.all().map(item => {\n  const d = item.json;\n  const wf = d.workflow || {};\n  const ex = d.execution || {};\n  const tr = d.trigger || {};\n  const err = ex.error || tr.error || {};\n  const failedAt = ex.lastNodeExecuted || (err.node && err.node.name) || 'the trigger';\n  const message = String(err.message || (err.cause && err.cause.message) || 'No error message').slice(0, 400);\n  const lines = [\n    `🚨 ${wf.name || 'A workflow'} failed`,\n    `Step: ${failedAt}`,\n    `Error: ${message}`,\n  ];\n  if (ex.url) lines.push(`Open the run: ${ex.url}`);\n  if (ex.retryOf) lines.push(`This was a retry of run ${ex.retryOf}.`);\n  if (!ex.id) lines.push('The trigger failed, so no run was created. Check the trigger step and its login/credentials.');\n  return { json: {\n    text: lines.join('\\n'),\n    subject: `n8n: \"${wf.name || 'workflow'}\" failed at ${failedAt}`,\n    workflowName: wf.name || '', failedAt, errorMessage: message, executionUrl: ex.url || '', mode: ex.mode || tr.mode || '',\n  } };\n});"
+      },
+      "id": "1970d232-5d75-591f-aa06-654e34ba149a",
+      "name": "Build the alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        470,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "n8n@yourdomain.com",
+        "toEmail": "you@yourdomain.com",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.text }}",
+        "options": {}
+      },
+      "id": "72fb650f-64bf-5f62-8ab5-e188b643553c",
+      "name": "Send the email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        700,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Error alert\nPublish this workflow, then point your other workflows at it:\n**Workflow → Settings → Error workflow → this one → Save.**\n\nIt only fires for production runs, not when you click Execute in the editor.",
+        "height": 220,
+        "width": 520,
+        "color": 5
+      },
+      "id": "602383aa-c07e-51f9-af1e-2a4a9bd53f1a",
+      "name": "Note 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        160,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "content": "Set From and To, and connect an SMTP login (your email provider's SMTP settings).",
+        "height": 120,
+        "width": 260,
+        "color": 7
+      },
+      "id": "4e8b519b-80c1-5b36-8d40-679c4dffc29d",
+      "name": "Note 2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        640,
+        460
+      ]
+    }
+  ],
+  "connections": {
+    "When any workflow fails": {
+      "main": [
+        [
+          {
+            "node": "Build the alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build the alert": {
+      "main": [
+        [
+          {
+            "node": "Send the email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

@@ -1,0 +1,112 @@
+{
+  "name": "Error alert (Slack)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "90828a82-ef91-5ccb-9c60-3a2e07cf0651",
+      "name": "When any workflow fails",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Turns n8n's error data into one readable alert.\n// n8n sends two shapes: `execution` when a step fails mid-run, `trigger` when the trigger itself fails (no run is created).\nreturn $input.all().map(item => {\n  const d = item.json;\n  const wf = d.workflow || {};\n  const ex = d.execution || {};\n  const tr = d.trigger || {};\n  const err = ex.error || tr.error || {};\n  const failedAt = ex.lastNodeExecuted || (err.node && err.node.name) || 'the trigger';\n  const message = String(err.message || (err.cause && err.cause.message) || 'No error message').slice(0, 400);\n  const lines = [\n    `🚨 ${wf.name || 'A workflow'} failed`,\n    `Step: ${failedAt}`,\n    `Error: ${message}`,\n  ];\n  if (ex.url) lines.push(`Open the run: ${ex.url}`);\n  if (ex.retryOf) lines.push(`This was a retry of run ${ex.retryOf}.`);\n  if (!ex.id) lines.push('The trigger failed, so no run was created. Check the trigger step and its login/credentials.');\n  return { json: {\n    text: lines.join('\\n'),\n    subject: `n8n: \"${wf.name || 'workflow'}\" failed at ${failedAt}`,\n    workflowName: wf.name || '', failedAt, errorMessage: message, executionUrl: ex.url || '', mode: ex.mode || tr.mode || '',\n  } };\n});"
+      },
+      "id": "bb4dc117-89f9-5bfc-9c21-4f359f083252",
+      "name": "Build the alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        470,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#alerts",
+          "mode": "name"
+        },
+        "text": "={{ $json.text }}",
+        "otherOptions": {}
+      },
+      "id": "7296adf7-a6dc-5855-b297-a5d9165f8787",
+      "name": "Send to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        700,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Error alert\nPublish this workflow, then point your other workflows at it:\n**Workflow → Settings → Error workflow → this one → Save.**\n\nIt only fires for production runs, not when you click Execute in the editor.",
+        "height": 220,
+        "width": 520,
+        "color": 5
+      },
+      "id": "5dd57670-495e-5a73-9ef5-821530e1884b",
+      "name": "Note 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        160,
+        40
+      ]
+    },
+    {
+      "parameters": {
+        "content": "Pick the Slack channel and connect your Slack login.",
+        "height": 120,
+        "width": 260,
+        "color": 7
+      },
+      "id": "14c31202-79d6-5709-b9a0-bfe735cbff09",
+      "name": "Note 2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        640,
+        460
+      ]
+    }
+  ],
+  "connections": {
+    "When any workflow fails": {
+      "main": [
+        [
+          {
+            "node": "Build the alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build the alert": {
+      "main": [
+        [
+          {
+            "node": "Send to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

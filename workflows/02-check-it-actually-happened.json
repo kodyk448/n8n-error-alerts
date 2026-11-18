@@ -1,0 +1,263 @@
+{
+  "name": "Check it actually happened (pattern)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "cac29ad3-5f5b-5f60-833f-1de9dd2de4e1",
+      "name": "Replace with your trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        200,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.example.com/records",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"name\": \"Example lead\",\n  \"email\": \"lead@example.com\"\n}",
+        "options": {}
+      },
+      "id": "d72830e8-9144-5a17-98d7-cf73dfc31b55",
+      "name": "Create the record (your step)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        420,
+        320
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "0170ff08-2a45-549f-9502-6ace1ca2c12c",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "cf1c8888-f6a5-5385-80e1-96e29e415c8c",
+      "name": "Did it return an ID?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        640,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.example.com/records/{{ $json.id }}",
+        "options": {}
+      },
+      "id": "540adac9-68de-5d72-a336-35d87990c5bb",
+      "name": "Read it back",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        220
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "e94a612b-a6da-598d-89e7-08995f691beb",
+              "leftValue": "={{ $json.id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "2f1eb8c7-a1d2-51f8-a795-63e0d871249c",
+      "name": "Is it really there?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        220
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "95b59715-5e4e-5d2c-a2b8-3dba4842011f",
+      "name": "Done",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1320,
+        140
+      ]
+    },
+    {
+      "parameters": {
+        "errorMessage": "=The create step finished but returned no ID. Response: {{ JSON.stringify($json).slice(0, 300) }}"
+      },
+      "id": "a6d13222-e794-5034-889a-85aca28bb6f2",
+      "name": "Fail: no ID came back",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        880,
+        440
+      ]
+    },
+    {
+      "parameters": {
+        "errorMessage": "=The record was created but can't be read back. Response: {{ JSON.stringify($json).slice(0, 300) }}"
+      },
+      "id": "bd247f65-7259-59ff-b2aa-e441e05f026b",
+      "name": "Fail: record not found",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        1320,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Check it actually happened\nCopy the two checks into any workflow that creates something (a CRM contact, a row, an invoice).\n\n**Always Output Data** is on for both HTTP steps (step Settings), so an empty response still reaches the check instead of silently ending the run.\n\nThe **Stop and Error** steps fail the run on purpose, which fires your error alert.",
+        "height": 260,
+        "width": 600,
+        "color": 5
+      },
+      "id": "bfabe6e5-18d4-50d9-baaf-e31223787c52",
+      "name": "Note 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        160,
+        20
+      ]
+    },
+    {
+      "parameters": {
+        "content": "Swap `$json.id` for whatever your app returns: `$json.contact.id`, `$json.data[0].id`, `$json.ok` ...",
+        "height": 110,
+        "width": 340,
+        "color": 7
+      },
+      "id": "1b77a326-81ef-51ac-a539-04935b31227d",
+      "name": "Note 2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        600,
+        520
+      ]
+    }
+  ],
+  "connections": {
+    "Replace with your trigger": {
+      "main": [
+        [
+          {
+            "node": "Create the record (your step)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create the record (your step)": {
+      "main": [
+        [
+          {
+            "node": "Did it return an ID?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Did it return an ID?": {
+      "main": [
+        [
+          {
+            "node": "Read it back",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail: no ID came back",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read it back": {
+      "main": [
+        [
+          {
+            "node": "Is it really there?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is it really there?": {
+      "main": [
+        [
+          {
+            "node": "Done",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fail: record not found",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}

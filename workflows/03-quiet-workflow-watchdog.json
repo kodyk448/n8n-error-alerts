@@ -1,0 +1,188 @@
+{
+  "name": "Quiet workflow watchdog",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "id": "afed25af-b115-515b-a52a-6abf9ebb120b",
+      "name": "Every morning at 8",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// The workflows you expect to run, and how long each may go without a successful run.\n// Find a workflow's ID in its URL: /workflow/<ID>\nreturn [\n  { workflowId: 'REPLACE_WITH_WORKFLOW_ID', name: 'Website form → CRM', maxHoursQuiet: 24 },\n  { workflowId: 'REPLACE_WITH_WORKFLOW_ID', name: 'Nightly invoice sync', maxHoursQuiet: 26 },\n].map(w => ({ json: w }));"
+      },
+      "id": "532a50b8-c890-54f2-af96-f0e94e536339",
+      "name": "Workflows to watch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        420,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://YOUR-N8N-DOMAIN/api/v1/executions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "workflowId",
+              "value": "={{ $json.workflowId }}"
+            },
+            {
+              "name": "status",
+              "value": "success"
+            },
+            {
+              "name": "limit",
+              "value": "1"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8acf9546-6bd9-5462-9e55-5b5b6491c735",
+      "name": "Last successful run",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        640,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Compares each workflow's last successful run with its allowed quiet time.\n// Returns nothing (so no alert is sent) when everything ran.\nconst watch = $('Workflows to watch').all();\nconst now = Date.now();\nconst quiet = [];\n$input.all().forEach((r, i) => {\n  const w = watch[i].json;\n  const last = (r.json.data || [])[0];\n  const when = last && (last.stoppedAt || last.startedAt);\n  const hours = when ? (now - new Date(when).getTime()) / 36e5 : Infinity;\n  if (hours > w.maxHoursQuiet) quiet.push({ ...w, lastSuccess: when || null, hoursQuiet: when ? Math.round(hours) : null });\n});\nif (!quiet.length) return [];\nconst lines = quiet.map(q => `• ${q.name}: ${q.lastSuccess ? `last successful run ${q.hoursQuiet} hours ago` : 'no successful run in the saved history'} (expected within ${q.maxHoursQuiet}h)`);\nreturn [{ json: { text: `🔕 ${quiet.length} workflow${quiet.length > 1 ? 's have' : ' has'} gone quiet\\n` + lines.join('\\n'), quiet } }];"
+      },
+      "id": "8c0754f3-a465-5267-a834-5a6e3bda263d",
+      "name": "Find the quiet ones",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        860,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "#alerts",
+          "mode": "name"
+        },
+        "text": "={{ $json.text }}",
+        "otherOptions": {}
+      },
+      "id": "4f6d72ef-9aae-5767-bbd1-ea535ca0a338",
+      "name": "Send to Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        1080,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## Quiet workflow watchdog\nCatches the failure that never errors: a trigger that stopped firing.\n\n1. **n8n API key:** Settings → n8n API → Create an API key.\n2. **Last successful run:** set your n8n address, and create a Header Auth login with name `X-N8N-API-KEY` and your key as the value.\n3. **Workflows to watch:** add each workflow's ID and how many hours it may stay quiet.\n4. Publish.",
+        "height": 270,
+        "width": 620,
+        "color": 5
+      },
+      "id": "6dfe6268-5445-580e-a890-dc95749d9874",
+      "name": "Note 1",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        140,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "content": "Needs successful production runs to be saved (the default). If a workflow is set not to save them, the watchdog sees nothing and reports it quiet.",
+        "height": 120,
+        "width": 360,
+        "color": 7
+      },
+      "id": "7528e530-1f63-5087-bcd5-4dcd5f55d437",
+      "name": "Note 2",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        580,
+        470
+      ]
+    }
+  ],
+  "connections": {
+    "Every morning at 8": {
+      "main": [
+        [
+          {
+            "node": "Workflows to watch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Workflows to watch": {
+      "main": [
+        [
+          {
+            "node": "Last successful run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Last successful run": {
+      "main": [
+        [
+          {
+            "node": "Find the quiet ones",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find the quiet ones": {
+      "main": [
+        [
+          {
+            "node": "Send to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}
